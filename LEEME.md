@@ -26,7 +26,7 @@ Cuenta con unos 30–45 minutos la primera vez. Solo necesitas un navegador.
 
 1. En Supabase ve a **Project Settings → API** (o **API Keys**).
 2. Copia la **Project URL** y la **anon / publishable key**.
-3. Abre `app/config.js` y reemplaza los dos valores:
+3. Abre `docs/config.js` y reemplaza los dos valores:
    ```js
    SUPABASE_URL: 'https://xxxxxxxx.supabase.co',
    SUPABASE_ANON_KEY: 'eyJ… o sb_publishable_…',
@@ -58,10 +58,12 @@ Si Claude rechaza alguna petición por sus filtros de seguridad, la función la 
 
 ## 5. Publica la app en GitHub Pages
 
-1. En **github.com**, crea un repositorio nuevo llamado `the-edit`, **público** (GitHub Pages gratis lo requiere) y vacío, sin README.
-2. Sube esta carpeta al repositorio. Yo puedo hacerlo por ti desde aquí. La carpeta `migration/`, con tus datos personales, nunca se sube; está excluida en `.gitignore`.
-3. En el repositorio ve a **Settings → Pages → Build and deployment → Source** y elige **GitHub Actions**.
-4. En la pestaña **Actions** verás "Publish THE EDIT". Cuando tenga la palomita verde, tu app está en `https://TU-USUARIO.github.io/the-edit/`.
+Tu repositorio es **github.com/durandanniela-oss/The_Edit**.
+
+1. En el repositorio presiona **Add file → Upload files**.
+2. Desde Finder (`Documentos/THE EDIT`), arrastra las carpetas **`docs`** y **`supabase`** a la página y presiona **Commit changes**. La carpeta `migration/` tiene tus datos personales: **no la subas**.
+3. Ve a **Settings → Pages**. En **Source** elige **Deploy from a branch**, en **Branch** elige **main** y la carpeta **/docs**, y presiona **Save**.
+4. En uno o dos minutos tu app está en **https://durandanniela-oss.github.io/The_Edit/**
 5. Regresa a Supabase, ve a **Authentication → URL Configuration** y pon esa dirección en **Site URL**.
 
 Que el código sea público no expone tus datos. Tu ropa, tus fotos y tus viajes viven en Supabase, protegidos por tu contraseña, y la llave de Claude vive en los secretos de Supabase, nunca en GitHub.
@@ -93,19 +95,18 @@ En la app, ve a **Profile → Import backup** y elige `migration/the-edit-backup
 
 ## Mantenimiento
 
-- **Actualizar la app:** cada cambio que se sube a GitHub (`git push`) se publica solo en un par de minutos.
+- **Actualizar la app:** cuando te entregue cambios, sube de nuevo los archivos que cambiaron a la carpeta `docs` del repositorio (**Add file → Upload files**). GitHub Pages los publica en uno o dos minutos.
 - **Supabase gratis se pausa** si pasa una semana sin que nadie abra la app. Para reactivarla, entra a supabase.com y presiona **Restore**. Tus datos no se pierden.
 - **Probar en tu computadora:** desde esta carpeta, en la Terminal:
   ```bash
-  python3 -m http.server 8642 --directory app
+  python3 -m http.server 8642 --directory docs
   ```
   Luego abre `http://localhost:8642`.
 
 ## Archivos
 
 ```
-app/                      ← lo que publica GitHub Pages
-.github/workflows/pages.yml ← la publicación automática
+docs/                     ← la app, lo que publica GitHub Pages
   index.html, styles.css, app.js, config.js
   manifest.webmanifest, sw.js, icons/
 supabase/
