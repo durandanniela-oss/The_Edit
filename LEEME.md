@@ -1,117 +1,89 @@
-# THE EDIT — cómo ponerla en línea
+# THE EDIT: cómo ponerla en línea (solo con GitHub)
 
-THE EDIT ahora es una app web independiente. Funciona en tu iPhone y tu laptop con su propio ícono y su propia dirección web, y no necesita claude.ai.
+THE EDIT es una app web que funciona en tu iPhone y tu laptop con su propio ícono.
 
-| Pieza | Para qué sirve | Servicio | Costo |
-|---|---|---|---|
-| La app | Las pantallas de THE EDIT | **GitHub Pages** | Gratis |
-| Base de datos, fotos e inicio de sesión | Tus prendas, looks, pins y viajes, privados para ti | **Supabase** | Gratis (500 MB de datos y 1 GB de fotos) |
-| Inteligencia artificial | Decodificar pins, estilista, portada y lectura de moodboard | **API de Claude (Anthropic)** | Pagas lo que usas |
-| Clima en vivo | Clima de hoy y pronóstico del viaje | **Open-Meteo** | Gratis, sin cuenta |
+| Pieza | Dónde vive | Costo |
+|---|---|---|
+| La app | Repositorio público **The_Edit**, publicado con GitHub Pages | Gratis |
+| Tus prendas, looks, pins, viajes y fotos | Repositorio **privado** `the-edit-data` | Gratis |
+| Inteligencia artificial | Tu propia llave de Claude, guardada solo en tus dispositivos | Pagas lo que usas |
+| Clima en vivo | Open-Meteo | Gratis, sin cuenta |
 
-Cuenta con unos 30–45 minutos la primera vez. Solo necesitas un navegador.
-
----
-
-## 1. Crea tu base de datos en Supabase
-
-1. Entra a **supabase.com**, crea una cuenta y presiona **New project**.
-   - Nombre: `the-edit`
-   - Región: la más cercana a ti, por ejemplo *East US*.
-   - Guarda la contraseña de la base de datos en un lugar seguro.
-2. Cuando el proyecto esté listo, ve a **SQL Editor → New query**.
-3. Abre el archivo `supabase/schema.sql` de esta carpeta, copia todo, pégalo y presiona **Run**. Debe decir *Success*.
-
-## 2. Conecta la app con tu proyecto
-
-1. En Supabase ve a **Project Settings → API** (o **API Keys**).
-2. Copia la **Project URL** y la **anon / publishable key**.
-3. Abre `docs/config.js` y reemplaza los dos valores:
-   ```js
-   SUPABASE_URL: 'https://xxxxxxxx.supabase.co',
-   SUPABASE_ANON_KEY: 'eyJ… o sb_publishable_…',
-   ```
-   Esa llave puede ser pública: tus datos están protegidos por tu inicio de sesión y por las reglas que creó el paso 1.
-
-## 3. Crea tu llave de la API de Claude
-
-1. Entra a **console.anthropic.com** y crea una cuenta.
-2. En **Billing**, agrega crédito (empieza con poco, por ejemplo 10 USD). Te recomiendo poner un **límite de gasto mensual**.
-3. En **API Keys → Create Key**, copia la llave (`sk-ant-…`). No la pegues en ningún archivo de la app.
-
-**Cuánto cuesta:** la app usa **Claude Opus 5.5**. Cada acción de IA (decodificar un pin, pedir looks, escribir la portada) cuesta aproximadamente entre 1 y 10 centavos de dólar. Leer tu moodboard con 8 fotos es lo más caro. Con uso normal, la mayoría de los meses son pocos dólares.
-
-## 4. Sube la función de IA
-
-Esta función guarda tu llave de Claude en el servidor, así nunca llega al navegador.
-
-1. En Supabase ve a **Edge Functions → Deploy a new function → Via Editor**.
-2. Nombre de la función: **`ai`**, exactamente así.
-3. Borra el código de ejemplo, pega todo `supabase/functions/ai/index.ts` y presiona **Deploy**.
-4. Ve a **Edge Functions → Secrets** y agrega:
-   - `ANTHROPIC_API_KEY` = tu llave `sk-ant-…`
-   - `ALLOWED_EMAIL` = tu correo. Así solo tu cuenta puede usar la IA.
-
-La función también importa imágenes desde enlaces de Pinterest. Solo acepta enlaces de Pinterest, para que nadie la pueda usar con otros sitios.
-
-Si Claude rechaza alguna petición por sus filtros de seguridad, la función la reintenta automáticamente con un modelo alternativo adecuado.
-
-## 5. Publica la app en GitHub Pages
-
-Tu repositorio es **github.com/durandanniela-oss/The_Edit**.
-
-1. En el repositorio presiona **Add file → Upload files**.
-2. Desde Finder (`Documentos/THE EDIT`), arrastra las carpetas **`docs`** y **`supabase`** a la página y presiona **Commit changes**. La carpeta `migration/` tiene tus datos personales: **no la subas**.
-3. Ve a **Settings → Pages**. En **Source** elige **Deploy from a branch**, en **Branch** elige **main** y la carpeta **/docs**, y presiona **Save**.
-4. En uno o dos minutos tu app está en **https://durandanniela-oss.github.io/The_Edit/**
-5. Regresa a Supabase, ve a **Authentication → URL Configuration** y pon esa dirección en **Site URL**.
-
-Que el código sea público no expone tus datos. Tu ropa, tus fotos y tus viajes viven en Supabase, protegidos por tu contraseña, y la llave de Claude vive en los secretos de Supabase, nunca en GitHub.
-
-## 6. Crea tu cuenta y ciérrala para los demás
-
-1. Abre tu dirección de GitHub Pages y presiona **Create my account** con tu correo y una contraseña.
-2. Si te llega un correo de confirmación, ábrelo y luego regresa a iniciar sesión.
-3. En Supabase ve a **Authentication → Sign In / Providers** (o **Settings**) y **desactiva "Allow new users to sign up"**. Con eso nadie más puede crear una cuenta.
-
-## 7. Trae lo que ya tenías
-
-En la app, ve a **Profile → Import backup** y elige `migration/the-edit-backup.json`. Trae tu viaje **Europe Edit**, tu foto de portada y el pin que ya decodificaste.
-
-## 8. Instálala
-
-- **iPhone:** abre tu dirección en **Safari**, toca **Compartir → Añadir a pantalla de inicio**. Aparece con tu ícono de THE EDIT y se abre a pantalla completa, sin barra del navegador. Inicia sesión una vez dentro del ícono.
-- **Mac con Chrome:** en la barra de direcciones toca el ícono de **Instalar**.
-- **Mac con Safari:** en el menú **Archivo → Añadir al Dock**.
+Tu app: **https://durandanniela-oss.github.io/The_Edit/**
 
 ---
 
-## Lo que cambió respecto a la versión de claude.ai
+## 1. Crea el repositorio privado para tus datos
 
-- **Clima en vivo:** pon tu ciudad en Profile y el clima de hoy se llena solo. En cada viaje, **Fill in the forecast** agrega el pronóstico de cada ciudad, hasta unos 16 días antes.
-- **Enlaces de Pinterest:** en *Save inspiration* pega el enlace de un pin y la app trae la imagen. Si Pinterest no lo permite, sube una captura.
-- **Guardar collages:** *Export* descarga el PNG. En el iPhone abre el menú de compartir para guardarlo en Fotos.
-- **Respaldo:** *Profile → Export my data* descarga un archivo con todos tus datos.
+1. Entra a **github.com/new**.
+2. En **Repository name** escribe `the-edit-data`.
+3. Elige **Private**. Es importante: la app no se conecta a un repositorio público.
+4. Marca **Add a README file** y presiona **Create repository**.
+
+## 2. Crea la llave de acceso de la app
+
+Esta llave le permite a THE EDIT guardar y leer **solo** en `the-edit-data`.
+
+1. Entra a **github.com/settings/personal-access-tokens/new**.
+2. Llena el formulario:
+   - **Token name:** `THE EDIT`
+   - **Expiration:** *Custom* → un año.
+   - **Repository access:** *Only select repositories* → `the-edit-data`.
+   - **Permissions → Repository permissions → Contents:** **Read and write**.
+3. Presiona **Generate token** y copia la llave (`github_pat_…`). GitHub la muestra una sola vez; guárdala en tus Notas o en tu gestor de contraseñas.
+
+## 3. Sube la versión nueva de la app
+
+En **github.com/durandanniela-oss/The_Edit** presiona **Add file → Upload files**. Desde `Documentos/THE EDIT/docs` arrastra estos archivos y presiona **Commit changes**:
+
+`app.js` · `index.html` · `config.js` · `manifest.webmanifest` · `sw.js` · `styles.css`
+
+Después borra los archivos que ya no se usan. Para cada uno: ábrelo → **⋯** → **Delete file** → **Commit changes**.
+- `the-edit-backup.json` (tiene tus datos personales)
+- `docs/CNAME`
+- `schema.sql`
+- `index.ts`
+
+## 4. Conecta la app
+
+1. Abre **https://durandanniela-oss.github.io/The_Edit/**
+2. En **Data repository** deja `the-edit-data` y en **GitHub access token** pega tu llave `github_pat_…`.
+3. Presiona **Connect**.
+
+Repite este paso una vez en cada dispositivo (iPhone y laptop). Los datos se sincronizan entre los dos.
+
+## 5. Activa la IA
+
+1. En **console.anthropic.com**, crea tu cuenta, agrega crédito en **Billing** (por ejemplo 10 USD) y pon un **límite de gasto mensual**.
+2. En **API Keys**, presiona **Create Key** y copia la llave (`sk-ant-…`).
+3. En THE EDIT ve a **Profile → AI**, pega la llave y presiona **Save key**. Hazlo en cada dispositivo.
+
+La app usa **Claude Opus 5.5**. Cada acción de IA cuesta aproximadamente entre 1 y 10 centavos de dólar. Si Claude rechaza algo por sus filtros de seguridad, se reintenta automáticamente con un modelo alternativo adecuado.
+
+## 6. Trae lo que ya tenías
+
+En **Profile → Import backup**, elige `Documentos/THE EDIT/migration/the-edit-backup.json`. Trae tu viaje Europe Edit, tu portada y el pin que decodificaste.
+
+## 7. Instálala
+
+- **iPhone:** abre la dirección en **Safari** → **Compartir → Añadir a pantalla de inicio**. Haz el paso 4 dentro del ícono instalado.
+- **Mac con Chrome:** presiona el ícono de **Instalar** en la barra de direcciones.
+- **Mac con Safari:** menú **Archivo → Añadir al Dock**.
+
+---
+
+## Seguridad
+
+- Tus datos viven en un repositorio **privado** y solo tu llave puede leerlo.
+- Las llaves (la de GitHub y la de Claude) se guardan **solo en el navegador de cada dispositivo**. Nunca se suben a GitHub.
+- **Si pierdes tu teléfono:** borra la llave en **github.com/settings/personal-access-tokens** y crea una nueva. En console.anthropic.com puedes borrar también la de Claude.
+- **Cada año** la llave de GitHub vence. Crea una nueva (paso 2) y vuelve a conectar (paso 4).
 
 ## Mantenimiento
 
-- **Actualizar la app:** cuando te entregue cambios, sube de nuevo los archivos que cambiaron a la carpeta `docs` del repositorio (**Add file → Upload files**). GitHub Pages los publica en uno o dos minutos.
-- **Supabase gratis se pausa** si pasa una semana sin que nadie abra la app. Para reactivarla, entra a supabase.com y presiona **Restore**. Tus datos no se pierden.
-- **Probar en tu computadora:** desde esta carpeta, en la Terminal:
+- **Actualizar la app:** sube los archivos que cambien al repositorio The_Edit (**Add file → Upload files**). GitHub Pages publica en uno o dos minutos.
+- **Respaldo:** en **Profile → Export my data** se descarga un archivo con todo. Además, el historial de `the-edit-data` guarda cada cambio.
+- **Probar en tu computadora:**
   ```bash
   python3 -m http.server 8642 --directory docs
   ```
-  Luego abre `http://localhost:8642`.
-
-## Archivos
-
-```
-docs/                     ← la app, lo que publica GitHub Pages
-  index.html, styles.css, app.js, config.js
-  manifest.webmanifest, sw.js, icons/
-supabase/
-  schema.sql              ← paso 1
-  functions/ai/index.ts   ← paso 4
-migration/
-  the-edit-backup.json    ← paso 7
-```
