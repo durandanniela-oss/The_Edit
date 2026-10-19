@@ -183,12 +183,14 @@ function aiErrMsg(e) {
     image_rejected: 'This image format could not be read. Try a JPEG or PNG.',
     refused: 'Claude declined this request. Try rephrasing it.',
     invalid_json: 'The answer came back incomplete. Try again.',
-    session_expired: 'Your session expired. Sign in again.',
+    session_expired: 'Your GitHub connection expired. Connect again.',
     offline: 'You seem to be offline. Check your connection and try again.',
-    not_configured: 'AI isn’t set up yet. Follow the AI step in LEEME.md.',
+    not_configured: 'Add your Claude API key in Profile → AI to use this.',
+    bad_key: 'Claude didn’t accept your API key. Check it in Profile → AI.',
+    no_credit: 'Your Anthropic account is out of credit. Add some at console.anthropic.com.',
     too_large: 'That request was too large. Try fewer or smaller images.',
     upstream_error: 'Claude didn’t answer just now. Try again in a moment.',
-  })[c] || (sample ? 'Something went wrong talking to Claude. Try again.' : 'AI isn’t set up yet. Follow the AI step in LEEME.md.');
+  })[c] || (sample ? 'Something went wrong talking to Claude. Try again.' : 'Add your Claude API key in Profile → AI to use this.');
 }
 function wardrobeBrief(list = S.garments) {
   return list.map(g => ({ id: g.id, name: g.name, category: g.category, type: g.sub, brand: g.brand, color: g.color, material: g.material,
@@ -746,8 +748,12 @@ function vProfile() {
       <div class="row"><button class="btn sm danger" data-a="wipePhotos">Delete my photos</button><button class="btn sm danger" data-a="wipeTryons">Delete try-on visualisations</button></div>
       <p class="small muted tab">${photos.length} personal photo${photos.length === 1 ? '' : 's'} · ${S.tryons.length} saved try-on${S.tryons.length === 1 ? '' : 's'} · ${S.garments.length} garments · ${S.looks.length} looks · ${S.inspo.length} inspirations</p>
       <hr class="rule mt"><h2 class="mt">Account</h2>
-      <p class="small muted">Signed in as ${esc((S.user || {}).email || '')}</p>
-      <div class="row"><button class="btn sm" data-a="exportData">Export my data</button><label class="btn sm" style="position:relative">Import backup<input type="file" accept="application/json,.json" data-up="backup" style="position:absolute;inset:0;opacity:0" aria-label="Import a backup file"></label><button class="btn sm ghost" data-a="signOut">Sign out</button></div>
+      <p class="small muted">Saved in your private repository ${esc((S.user || {}).repo || '')}</p>
+      <div class="row"><button class="btn sm" data-a="exportData">Export my data</button><label class="btn sm" style="position:relative">Import backup<input type="file" accept="application/json,.json" data-up="backup" style="position:absolute;inset:0;opacity:0" aria-label="Import a backup file"></label><button class="btn sm ghost" data-a="signOut">Disconnect this device</button></div>
+      <hr class="rule mt"><h2 class="mt">AI</h2>
+      <p class="small muted">${AIKEY ? 'Claude is on for this device.' : 'Add your Claude API key to turn on the stylist, pin decoding, covers and garment recognition.'}</p>
+      ${AIKEY ? `<div class="row"><button class="btn sm ghost" data-a="removeAiKey">Remove key from this device</button></div>` : `<div class="row"><input class="inp" id="aiKey" type="password" autocomplete="off" placeholder="sk-ant-…" style="flex:1;min-width:0" aria-label="Claude API key"><button class="btn sm" data-a="saveAiKey">Save key</button></div>`}
+      <p class="small muted">The key stays in this browser only; add it once on each device. Set a monthly spend limit at console.anthropic.com.</p>
     </section>
     <section>
       <p class="eyebrow">The fitting room</p>
@@ -844,9 +850,9 @@ function sAddInspo() {
     <label class="opt"><b>Pinterest screenshot</b><span>Upload a screenshot of a pin.</span><input type="file" accept="image/*" multiple data-up="inspo" aria-label="Upload screenshot"></label>
     <label class="opt"><b>Import image</b><span>Any outfit photo from your device.</span><input type="file" accept="image/*" multiple data-up="inspo" aria-label="Import image"></label>
   </div>
-  <div class="field mt2"><label for="inLink">Import from a Pinterest link</label>
-    <div class="row"><input class="inp" id="inLink" placeholder="https://pin.it/…" style="flex:1;min-width:0" value="${esc(S.inLink || '')}"><button class="btn sm" data-a="inspoLink" ${S.linkBusy ? 'disabled' : ''}>${S.linkBusy ? 'Importing…' : 'Import'}</button></div>
-    <p class="small muted">Paste a pin’s link and THE EDIT brings in its image. If Pinterest doesn’t allow it, save a screenshot instead. You can also paste a copied image (⌘V / Ctrl+V) anywhere in the app.</p></div>`;
+  <div class="field mt2"><label for="inLink">Pin link (optional)</label>
+    <div class="row"><input class="inp" id="inLink" placeholder="https://pin.it/…" style="flex:1;min-width:0" value="${esc(S.inLink || '')}"></div>
+    <p class="small muted">Paste the pin’s link before adding the screenshot and it’s saved as the source. You can also paste a copied image (⌘V / Ctrl+V) anywhere in the app.</p></div>`;
 }
 function sInspo() {
   const i = byId('inspo', S.inspoId); if (!i) return '<p>Not found.</p>';
@@ -994,30 +1000,14 @@ const A = {
     toast(`${S.decAll.done} pin${S.decAll.done === 1 ? '' : 's'} decoded.`); S.decAll = null; render();
   },
   tone: v => { S.tone = v; applyTone(); try { localStorage.setItem('edit.tone', v); } catch (e) {} render(); },
-  signIn: () => doAuth('in'),
-  signUp: () => doAuth('up'),
-  signOut: () => { sb.auth.signOut(); },
+  signOut: () => confirmSheet('Disconnect this device?', () => disconnect(), 'Disconnect'),
+  saveAiKey: () => { const k = ($('#aiKey').value || '').trim(); if (!/^sk-ant-/.test(k)) { toast('That doesn’t look like a Claude API key. It starts with sk-ant-'); return; } AIKEY = k; LS.set('edit.aiKey', k); render(); toast('Claude is on for this device.'); },
+  removeAiKey: () => { AIKEY = ''; LS.set('edit.aiKey', ''); render(); toast('Claude key removed from this device.'); },
   exportData: () => exportBackup().catch(() => toast('The backup could not be saved.')),
   wxLive: async () => {
     const city = ($('#wCity').value || '').trim(); if (!city) { toast('Type a city first.'); return; }
     try { const w = await liveWeather(city); await saveProfile({ weather: w, city: S.profile.city || w.city }); closeSheet(); toast(`Live weather for ${w.city}.`); }
     catch (e) { toast('That city wasn’t found, or the weather service didn’t answer.'); }
-  },
-  inspoLink: async () => {
-    const url = ($('#inLink').value || '').trim();
-    if (!/^https:\/\//i.test(url)) { toast('Paste a full Pinterest link that starts with https://'); return; }
-    S.linkBusy = true; S.inLink = url; refreshSheet(true);
-    try {
-      const j = await fnCall({ action: 'fetchImage', url });
-      const r = await storeImage(await shrink(b64ToBlob(j.data, j.type), 1600));
-      const item = { id: uid(), ...r, source: url, tags: [], collections: S.ifl.col ? [S.ifl.col] : [], createdAt: Date.now() };
-      await put('inspo', item); S.linkBusy = false; S.inLink = '';
-      if (S.view !== 'inspo') go('inspo');
-      A.openInspo(item.id);
-    } catch (e) {
-      S.linkBusy = false; refreshSheet(true);
-      toast(e && e.code === 'unsupported_site' ? 'Only Pinterest links can be imported.' : e && e.code === 'no_image' ? 'Pinterest didn’t share an image for this link. Save a screenshot instead.' : aiErrMsg(e));
-    }
   },
   tripForecast: async () => {
     const tr = clean(byId('trips', S.tripId)); const t = todayISO(), lim = addDays(t, 15); let n = 0;
@@ -1278,110 +1268,203 @@ document.addEventListener('pointerup', () => {
 });
 
 
-/* ============ backend: Supabase + your own AI function ============ */
-let sb = null, UID = null;
-const URLS = {}, URL_FAIL = new Set(), needUrl = new Set(); let urlTimer = null;
-function srcOf(o) {
-  if (!o) return '';
-  if (o.imgId) {
-    const u = URLS[o.imgId];
-    if (!u && !URL_FAIL.has(o.imgId) && sb) { needUrl.add(o.imgId); clearTimeout(urlTimer); urlTimer = setTimeout(loadUrls, 20); }
-    return u || '';
-  }
-  return o.img || '';
+/* ============ backend: a private GitHub repository + Claude with your own key ============ */
+const GH = 'https://api.github.com';
+const LS = { get: k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }, set: (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch (e) {} } };
+let TOKEN = LS.get('edit.ghToken'), REPO = LS.get('edit.ghRepo'), BRANCH = LS.get('edit.ghBranch') || 'main', AIKEY = LS.get('edit.aiKey');
+
+async function gh(path, opts = {}) {
+  const headers = { Authorization: `Bearer ${TOKEN}`, Accept: opts.accept || 'application/vnd.github+json' };
+  if (opts.body) headers['Content-Type'] = 'application/json';
+  let r;
+  try { r = await fetch(GH + path, { method: opts.method || 'GET', headers, body: opts.body, cache: 'no-store' }); }
+  catch (e) { throw { code: 'offline' }; }
+  if (r.status === 401) throw { code: 'session_expired', status: 401 };
+  return r;
 }
-async function loadUrls() {
-  const ids = [...needUrl]; needUrl.clear(); if (!ids.length) return;
-  const { data } = await sb.storage.from('images').createSignedUrls(ids, 60 * 60 * 24 * 7);
-  const got = new Set();
-  (data || []).forEach(d => { if (d.signedUrl) { URLS[d.path] = d.signedUrl; got.add(d.path); } });
-  ids.forEach(id => { if (!got.has(id)) URL_FAIL.add(id); });
-  softRender();
+const enc = new TextEncoder(), dec = new TextDecoder();
+function bytesToB64(u8) { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
+function b64ToBytes(b64) { const bin = atob(b64); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; }
+function b64ToBlob(b64, type) { return new Blob([b64ToBytes(b64)], { type }); }
+const contentsPath = p => `/repos/${REPO}/contents/${p.split('/').map(encodeURIComponent).join('/')}`;
+
+async function readFile(path) {
+  const r = await gh(`${contentsPath(path)}?ref=${encodeURIComponent(BRANCH)}`);
+  if (r.status === 404) return { sha: null, text: null };
+  if (!r.ok) throw { code: 'unavailable', status: r.status };
+  const j = await r.json();
+  if (j.encoding === 'base64' && j.content) return { sha: j.sha, text: dec.decode(b64ToBytes(j.content.replace(/\s/g, ''))) };
+  const raw = await gh(`${contentsPath(path)}?ref=${encodeURIComponent(BRANCH)}`, { accept: 'application/vnd.github.raw+json' });
+  return { sha: j.sha, text: await raw.text() };
+}
+async function writeFile(path, b64, sha, message) {
+  const body = { message, content: b64, branch: BRANCH }; if (sha) body.sha = sha;
+  const r = await gh(contentsPath(path), { method: 'PUT', body: JSON.stringify(body) });
+  if (!r.ok) return { ok: false, status: r.status };
+  const j = await r.json(); return { ok: true, sha: j.content && j.content.sha };
 }
 
+/* Each collection is one JSON file in the data repo: data/garments.json, data/looks.json … */
 function makeDb() {
-  const listeners = {}, timers = {};
+  const store = {}, listeners = {}, pend = {}, waiters = {}, timers = {}, busy = {}, gen = {};
+  const file = col => `data/${col}.json`;
+  async function readCol(col) {
+    const { sha, text } = await readFile(file(col));
+    let docs = {}; if (text) { try { docs = JSON.parse(text) || {}; } catch (e) { docs = {}; } }
+    return { sha, docs };
+  }
+  function emit(col) {
+    const rows = Object.entries((store[col] || {}).docs || {}).map(([id, data]) => ({ id, data }));
+    (listeners[col] || new Set()).forEach(fn => fn(rows));
+  }
   async function refresh(col) {
-    const set = listeners[col]; if (!set) return;
-    const { data, error } = await sb.from('docs').select('id,data').eq('col', col);
-    if (error) return;
-    set.forEach(fn => fn(data || []));
+    if (busy[col] || (pend[col] && pend[col].size)) return;
+    const g = gen[col] || 0;
+    try {
+      const cur = await readCol(col);
+      if ((gen[col] || 0) !== g || busy[col]) return; // a local change happened meanwhile; the write will bring fresh data
+      if (!store[col] || store[col].sha !== cur.sha) { store[col] = cur; emit(col); }
+    }
+    catch (e) { if (e.code === 'session_expired') disconnect('Your GitHub token stopped working. Connect again with a new one.'); }
   }
-  const later = col => { clearTimeout(timers[col]); timers[col] = setTimeout(() => refresh(col), 250); };
-  function listen(col, fn) { (listeners[col] = listeners[col] || new Set()).add(fn); refresh(col); return () => listeners[col].delete(fn); }
-  async function write(col, id, data) {
-    const { error } = await sb.from('docs').upsert({ user_id: UID, col, id, data, updated_at: new Date().toISOString() }, { onConflict: 'user_id,col,id' });
-    if (error) throw { code: 'unavailable', message: error.message };
+  async function flush(col) {
+    if (busy[col]) { timers[col] = setTimeout(() => flush(col), 400); return; }
+    const ops = pend[col], ws = waiters[col] || [];
+    if (!ops || !ops.size) return;
+    pend[col] = new Map(); waiters[col] = []; busy[col] = true;
+    try {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const cur = await readCol(col);
+        for (const [id, d] of ops) { if (d === null) delete cur.docs[id]; else cur.docs[id] = d; }
+        const r = await writeFile(file(col), bytesToB64(enc.encode(JSON.stringify(cur.docs))), cur.sha, `THE EDIT · ${col}`);
+        if (r.ok) { store[col] = { sha: r.sha, docs: cur.docs }; if (!(pend[col] && pend[col].size)) emit(col); ws.forEach(w => w.res()); return; }
+        if (r.status !== 409 && r.status !== 422) throw { code: r.status === 403 || r.status === 404 ? 'invalid_argument' : 'unavailable' };
+        await new Promise(res => setTimeout(res, 300 + attempt * 400));
+      }
+      throw { code: 'unavailable' };
+    } catch (e) { ws.forEach(w => w.rej(e && e.code ? e : { code: 'unavailable' })); }
+    finally { busy[col] = false; }
   }
-  async function remove(col, id) {
-    const { error } = await sb.from('docs').delete().eq('col', col).eq('id', id);
-    if (error) throw { code: 'unavailable', message: error.message };
+  function enqueue(col, id, data) {
+    gen[col] = (gen[col] || 0) + 1;
+    (pend[col] = pend[col] || new Map()).set(id, data);
+    return new Promise((res, rej) => { (waiters[col] = waiters[col] || []).push({ res, rej }); clearTimeout(timers[col]); timers[col] = setTimeout(() => flush(col), 700); });
   }
-  sb.channel('docs-' + UID)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'docs', filter: 'user_id=eq.' + UID }, p => { const col = (p.new && p.new.col) || (p.old && p.old.col); if (col) later(col); })
-    .subscribe();
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') Object.keys(listeners).forEach(later); });
+  function listen(col, fn) { (listeners[col] = listeners[col] || new Set()).add(fn); if (store[col]) fn(Object.entries(store[col].docs).map(([id, data]) => ({ id, data }))); else refresh(col); }
+  const refreshAll = () => Object.keys(listeners).forEach(refresh);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshAll(); });
+  setInterval(() => { if (document.visibilityState === 'visible') refreshAll(); }, 90000);
   return {
     collection: col => ({
-      doc: id => ({ set: d => write(col, id, d), delete: () => remove(col, id) }),
+      doc: id => ({ set: d => enqueue(col, id, d), delete: () => enqueue(col, id, null) }),
       onSnapshot: next => listen(col, rows => next({ docs: rows.map(r => ({ id: r.id, exists: true, data: () => r.data })) })),
     }),
     doc: path => {
       const [col, id] = path.split('/');
-      return { set: d => write(col, id, d), onSnapshot: next => listen(col, rows => { const r = rows.find(x => x.id === id); next({ exists: !!r, data: () => r && r.data }); }) };
+      return { set: d => enqueue(col, id, d), onSnapshot: next => listen(col, rows => { const r = rows.find(x => x.id === id); next({ exists: !!r, data: () => r && r.data }); }) };
     },
   };
+}
+
+/* Photos live in images/ in the same private repo; this device keeps a copy so they load fast. */
+const URLS = {}, URL_FAIL = new Set(); let imgQueue = [], imgActive = 0;
+const IMG_CACHE = 'the-edit-images';
+const cacheKey = p => new Request('https://the-edit.local/' + p);
+function srcOf(o) {
+  if (!o) return '';
+  if (o.imgId) {
+    const u = URLS[o.imgId];
+    if (u === undefined && !URL_FAIL.has(o.imgId) && TOKEN) { URLS[o.imgId] = ''; imgQueue.push(o.imgId); pumpImages(); }
+    return u || '';
+  }
+  return o.img || '';
+}
+function pumpImages() {
+  while (imgActive < 4 && imgQueue.length) {
+    const p = imgQueue.shift(); imgActive++;
+    loadImage(p).then(u => { URLS[p] = u; softRender(); }).catch(() => { URL_FAIL.add(p); delete URLS[p]; })
+      .finally(() => { imgActive--; pumpImages(); });
+  }
+}
+async function loadImage(p) {
+  let blob = null;
+  try { const c = await caches.open(IMG_CACHE); const hit = await c.match(cacheKey(p)); if (hit) blob = await hit.blob(); } catch (e) {}
+  if (!blob) {
+    const r = await gh(`${contentsPath(p)}?ref=${encodeURIComponent(BRANCH)}`, { accept: 'application/vnd.github.raw+json' });
+    if (!r.ok) throw new Error('image');
+    blob = await r.blob();
+    try { const c = await caches.open(IMG_CACHE); await c.put(cacheKey(p), new Response(blob)); } catch (e) {}
+  }
+  const u = URL.createObjectURL(blob); blobCache[u] = blob; return u;
 }
 function makeAssets() {
   return {
     upload: async blob => {
-      const ext = ((blob.type || 'image/jpeg').split('/')[1] || 'jpg').replace('jpeg', 'jpg').replace('svg+xml', 'svg');
-      const path = `${UID}/${uid()}.${ext}`;
-      const { error } = await sb.storage.from('images').upload(path, blob, { contentType: blob.type || 'image/jpeg', upsert: false });
-      if (error) throw { code: /size|large/i.test(error.message) ? 'too_large' : 'upstream_error', message: error.message };
+      const ext = ((blob.type || 'image/jpeg').split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+      const path = `images/${uid()}.${ext}`;
+      const r = await writeFile(path, bytesToB64(new Uint8Array(await blob.arrayBuffer())), null, 'THE EDIT · photo');
+      if (!r.ok) throw { code: r.status === 413 || r.status === 422 ? 'too_large' : 'upstream_error' };
+      try { const c = await caches.open(IMG_CACHE); await c.put(cacheKey(path), new Response(blob)); } catch (e) {}
       const local = URL.createObjectURL(blob); URLS[path] = local;
       return { id: path, url: local };
     },
-    delete: async id => { await sb.storage.from('images').remove([id]); return { deleted: true }; },
+    delete: async id => {
+      try {
+        const r = await gh(`${contentsPath(id)}?ref=${encodeURIComponent(BRANCH)}`);
+        if (r.ok) { const j = await r.json(); await gh(contentsPath(id), { method: 'DELETE', body: JSON.stringify({ message: 'THE EDIT · remove photo', sha: j.sha, branch: BRANCH }) }); }
+        const c = await caches.open(IMG_CACHE); await c.delete(cacheKey(id));
+      } catch (e) {}
+      return { deleted: true };
+    },
   };
 }
-async function fnCall(body) {
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) throw { code: 'session_expired' };
-  let r;
-  try {
-    r = await fetch(`${EDIT_CONFIG.SUPABASE_URL}/functions/v1/ai`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}`, apikey: EDIT_CONFIG.SUPABASE_ANON_KEY },
-      body: JSON.stringify(body),
-    });
-  } catch (e) { throw { code: 'offline' }; }
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw { code: j.code || (r.status === 404 ? 'not_configured' : 'upstream_error'), message: j.error || '' };
-  return j;
-}
-async function toJpegB64(blob) {
-  const small = await shrink(blob, 1280);
-  const buf = new Uint8Array(await small.arrayBuffer()); let s = '';
-  for (let i = 0; i < buf.length; i += 0x8000) s += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
-  return { type: 'image/jpeg', data: btoa(s) };
-}
-function b64ToBlob(b64, type) { const bin = atob(b64); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new Blob([u], { type }); }
+
+/* Claude, called straight from this device with your own API key. */
+const SYSTEM = 'You are the styling engine inside THE EDIT, a private wardrobe and outfit-planning app used by one person. Follow the requested output format exactly. When the request asks for JSON, reply with a single JSON object and nothing else.';
+const EFFORT = { quick: 'low', default: 'medium', complex: 'high' };
+let anthropicMod = null;
+async function toJpegB64(blob) { const small = await shrink(blob, 1280); return { type: 'image/jpeg', data: bytesToB64(new Uint8Array(await small.arrayBuffer())) }; }
 function parseJSON(text) {
-  let t = String(text || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+  const t = String(text || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
   const a = t.indexOf('{'), b = t.lastIndexOf('}');
   if (a < 0 || b < a) throw { code: 'invalid_json' };
   try { return JSON.parse(t.slice(a, b + 1)); } catch (e) { throw { code: 'invalid_json' }; }
 }
-function makeSample() {
-  async function call(prompt, opts = {}) {
-    const imgs = [];
-    for (const b of [].concat(opts.images || [])) imgs.push(await toJpegB64(b));
-    const j = await fnCall({ action: 'ai', prompt: typeof prompt === 'string' ? prompt : prompt.map(m => m.content).join('\n\n'), images: imgs, tier: opts.modelTier || 'default' });
-    return j.text || '';
+async function callClaude(prompt, opts = {}) {
+  if (!AIKEY) throw { code: 'not_configured' };
+  if (!anthropicMod) { try { anthropicMod = await import('https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@0.131.0/+esm'); } catch (e) { throw { code: 'offline' }; } }
+  const Anthropic = anthropicMod.default;
+  const client = new Anthropic({ apiKey: AIKEY, dangerouslyAllowBrowser: true });
+  const content = [];
+  for (const b of [].concat(opts.images || [])) { const im = await toJpegB64(b); content.push({ type: 'image', source: { type: 'base64', media_type: im.type, data: im.data } }); }
+  content.push({ type: 'text', text: typeof prompt === 'string' ? prompt : prompt.map(m => m.content).join('\n\n') });
+  try {
+    const response = await client.beta.messages.create({
+      model: 'claude-opus-5-5',
+      max_tokens: 16000,
+      system: SYSTEM,
+      output_config: { effort: EFFORT[opts.modelTier] || 'medium' },
+      // If a safety classifier declines, the API retries on a suitable fallback model in the same call.
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+      messages: [{ role: 'user', content }],
+    });
+    if (response.stop_reason === 'refusal') throw { code: 'refused' };
+    const text = response.content.filter(b => b.type === 'text').map(b => b.text).join('');
+    if (!text) throw { code: 'empty_completion' };
+    return text;
+  } catch (error) {
+    if (error && error.code && !(error instanceof Anthropic.APIError)) throw error;
+    if (error instanceof Anthropic.RateLimitError) throw { code: 'rate_limited' };
+    if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) throw { code: 'bad_key' };
+    if (error instanceof Anthropic.BadRequestError) throw { code: /credit|billing/i.test(error.message) ? 'no_credit' : 'invalid_request' };
+    if (error instanceof Anthropic.APIConnectionError) throw { code: 'offline' };
+    throw { code: 'upstream_error' };
   }
-  const fn = async (p, o) => ({ text: await call(p, o), truncated: false });
-  fn.json = async (p, o) => parseJSON(await call(p, o));
+}
+function makeSample() {
+  const fn = async (p, o) => ({ text: await callClaude(p, o), truncated: false });
+  fn.json = async (p, o) => parseJSON(await callClaude(p, o));
   fn.limits = async () => ({ maxPromptBytes: 400000, images: { maxCount: 8, maxInputBytes: 5e6, mediaTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] } });
   return fn;
 }
@@ -1438,47 +1521,53 @@ async function exportBackup() {
   await downloads.save({ filename: `the-edit-backup-${todayISO()}.json`, data: new Blob([JSON.stringify({ version: 1, docs, images: {} }, null, 1)], { type: 'application/json' }) });
 }
 
-/* gate: setup + sign in */
+/* connect screen */
 function renderGate() {
   $('#nav').innerHTML = ''; $('#nav2').innerHTML = ''; $('#botnav').innerHTML = ''; $('#banner').innerHTML = '';
-  $('#main').innerHTML = S.mode === 'setup'
-    ? `<div class="gate"><p class="muted">Add your Supabase project URL and key to <b>config.js</b> to finish setting up. The steps are in LEEME.md.</p></div>`
-    : S.mode === 'connecting' ? `<div class="gate"><p class="muted">Opening…</p></div>`
-    : `<form class="gate" id="authForm" novalidate>
+  const repoName = (REPO.split('/')[1]) || ((window.EDIT_CONFIG || {}).DATA_REPO) || 'the-edit-data';
+  $('#main').innerHTML = S.mode === 'connecting' ? `<div class="gate"><p class="muted">Opening…</p></div>`
+    : `<form class="gate" id="ghForm" novalidate>
         <p class="muted">Get dressed, thoughtfully.</p>
-        <div class="field"><label for="auEmail">Email</label><input class="inp" id="auEmail" type="email" autocomplete="email" required></div>
-        <div class="field"><label for="auPass">Password</label><input class="inp" id="auPass" type="password" autocomplete="current-password" minlength="8" required></div>
-        <button class="btn primary" data-a="signIn" type="submit">Sign in</button>
-        <button class="btn ghost" data-a="signUp" type="button">Create my account</button>
-        <p class="small muted" id="auMsg" role="status">${esc(S.authMsg || '')}</p>
+        <p class="small muted">Connect THE EDIT to your private GitHub repository. Your wardrobe, photos and trips are saved there.</p>
+        <div class="field"><label for="ghRepo">Data repository</label><input class="inp" id="ghRepo" value="${esc(repoName)}" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
+        <div class="field"><label for="ghToken">GitHub access token</label><input class="inp" id="ghToken" type="password" autocomplete="off" placeholder="github_pat_…"></div>
+        <button class="btn primary" type="submit">Connect</button>
+        <p class="small muted" id="ghMsg" role="status">${esc(S.authMsg || '')}</p>
       </form>`;
 }
-async function doAuth(kind) {
-  const email = ($('#auEmail') || {}).value || '', password = ($('#auPass') || {}).value || '';
-  const msg = t => { S.authMsg = t; const m = $('#auMsg'); if (m) m.textContent = t; };
-  if (!email || password.length < 8) { msg('Enter your email and a password of at least 8 characters.'); return; }
-  msg(kind === 'up' ? 'Creating your account…' : 'Signing in…');
-  const { data, error } = kind === 'up' ? await sb.auth.signUp({ email, password }) : await sb.auth.signInWithPassword({ email, password });
-  if (error) { msg(kind === 'up' && /not allowed|disabled/i.test(error.message) ? 'New accounts are switched off for this app.' : error.message); return; }
-  if (!data.session) { msg('Check your email and confirm your address, then sign in here.'); return; }
-  S.authMsg = ''; start(data.session.user);
+async function connect() {
+  const msg = t => { S.authMsg = t; const m = $('#ghMsg'); if (m) m.textContent = t; };
+  const token = ($('#ghToken').value || '').trim(), name = ($('#ghRepo').value || '').trim().replace(/^.*\//, '');
+  if (!token || !name) { msg('Enter the repository name and your access token.'); return; }
+  msg('Connecting…'); TOKEN = token;
+  try {
+    const u = await gh('/user'); if (!u.ok) throw { code: 'session_expired' };
+    const me = await u.json();
+    const r = await gh(`/repos/${me.login}/${name}`);
+    if (r.status === 404) { TOKEN = ''; msg(`No access to ${me.login}/${name}. Check the name and that the token includes this repository.`); return; }
+    const repo = await r.json();
+    if (!repo.private) { TOKEN = ''; msg(`${repo.full_name} is public. Make it private first (Settings → General → Danger Zone → Change visibility), then connect.`); return; }
+    if (repo.permissions && repo.permissions.push === false) { TOKEN = ''; msg('This token can read but not save. Give it “Contents: Read and write”.'); return; }
+    REPO = repo.full_name; BRANCH = repo.default_branch || 'main';
+    LS.set('edit.ghToken', TOKEN); LS.set('edit.ghRepo', REPO); LS.set('edit.ghBranch', BRANCH);
+    S.authMsg = ''; start({ login: me.login });
+  } catch (e) { TOKEN = ''; msg(e.code === 'offline' ? 'You seem to be offline.' : 'GitHub didn’t accept this token. Check it and try again.'); }
 }
-document.addEventListener('submit', e => { if (e.target.id === 'authForm') { e.preventDefault(); doAuth('in'); } });
+function disconnect(message) {
+  LS.set('edit.ghToken', ''); LS.set('edit.ghRepo', ''); LS.set('edit.ghBranch', '');
+  try { caches.delete(IMG_CACHE); } catch (e) {}
+  S.authMsg = message || ''; location.reload();
+}
+document.addEventListener('submit', e => { if (e.target.id === 'ghForm') { e.preventDefault(); connect(); } });
 
 /* ============ boot ============ */
 function start(user) {
-  UID = user.id; S.user = { email: user.email };
+  S.user = { login: user.login || REPO.split('/')[0], repo: REPO };
   db = makeDb(); assets = makeAssets(); sample = makeSample(); downloads = makeDownloads();
   S.mode = 'live'; S.imgMax = 8;
   subscribe(); render();
 }
-async function boot() {
-  const cfg = window.EDIT_CONFIG || {};
-  if (!window.supabase || !cfg.SUPABASE_URL || /YOUR-|your-/.test(cfg.SUPABASE_URL + cfg.SUPABASE_ANON_KEY)) { S.mode = 'setup'; renderGate(); return; }
-  S.mode = 'connecting'; renderGate();
-  sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
-  sb.auth.onAuthStateChange(ev => { if (ev === 'SIGNED_OUT') location.reload(); });
-  const { data: { session } } = await sb.auth.getSession();
-  if (session) start(session.user); else { S.mode = 'auth'; renderGate(); }
+function boot() {
+  if (TOKEN && REPO) start({}); else { S.mode = 'auth'; renderGate(); }
 }
 boot();

@@ -1,0 +1,6 @@
+# Personal data: never publish
+migration/
+# Old claude.ai version and local tooling
+the-edit.html
+.claude/
+.DS_Store
